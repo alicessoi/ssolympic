@@ -13,7 +13,10 @@ export default function NavBar() {
 
   return (
     <nav className="navbar">
-      <NavLink to="/" className="nav-brand">双十中学竞赛管理</NavLink>
+      <NavLink to="/" className="nav-brand">
+        <img src="./sslogo.png" alt="" className="nav-logo" />
+        厦门双十中学竞赛管理
+      </NavLink>
       <div className="nav-links">
         <NavLink to="/" end>首页</NavLink>
         <div className="nav-subject-group">

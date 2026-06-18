@@ -9,6 +9,7 @@ function filterAwards(filters = {}) {
   if (filters.academic_year) rows = rows.filter(r => r.academic_year === filters.academic_year)
   if (filters.award_level) rows = rows.filter(r => r.award_level === filters.award_level)
   if (filters.award) rows = rows.filter(r => r.award === filters.award)
+  if (filters.contest) rows = rows.filter(r => r.contest_name === filters.contest)
   if (filters.keyword) {
     const kw = String(filters.keyword)
     rows = rows.filter(r =>
@@ -76,10 +77,27 @@ function pivot(rows, category) {
     })
 }
 
+const AWARD_RANK = { '一等奖': 1, '金牌': 1, '二等奖': 2, '银牌': 2, '三等奖': 3, '铜牌': 3 }
+
+function applySort(rows, sort, dir) {
+  const sign = dir === 'asc' ? 1 : -1
+  const cmpStr = (a, b) => sign * String(a).localeCompare(String(b))
+  const cmpNum = (a, b) => sign * ((a ?? 0) - (b ?? 0))
+  return [...rows].sort((x, y) => {
+    if (sort === 'award') return (AWARD_RANK[x.award] ?? 9) - (AWARD_RANK[y.award] ?? 9)
+    if (sort === 'award_level') {
+      const lv = { '国家级': 4, '省级': 3, '市级': 2, '校级': 1 }
+      return (lv[x.award_level] ?? 0) - (lv[y.award_level] ?? 0)
+    }
+    if (sort === 'instructor_bonus' || sort === 'group_bonus') return cmpNum(x[sort], y[sort])
+    return cmpStr(x[sort], y[sort])
+  })
+}
+
 export const api = {
   awards(params = {}) {
-    const { page = 1, limit = 50, ...filters } = params
-    const all = filterAwards(filters)
+    const { page = 1, limit = 50, sort = 'academic_year', dir = 'desc', ...filters } = params
+    const all = applySort(filterAwards(filters), sort, dir)
     const start = (page - 1) * limit
     return Promise.resolve({
       data: all.slice(start, start + limit),
@@ -89,15 +107,21 @@ export const api = {
     })
   },
   years(subject) {
-    const years = [...new Set(AWARDS.filter(a => !subject || a.subject === subject).map(a => a.academic_year))]
-      .filter(Boolean).sort().reverse()
+    const rows = AWARDS.filter(a => !subject || a.subject === subject)
+    const counts = new Map()
+    for (const r of rows) if (r.academic_year) counts.set(r.academic_year, (counts.get(r.academic_year) || 0) + 1)
+    const years = [...counts.entries()].map(([academic_year, c]) => ({ academic_year, c }))
+    years.sort((a, b) => b.academic_year.localeCompare(a.academic_year))
     return Promise.resolve({ data: years })
   },
   contests(subject, academicYear) {
     let rows = AWARDS
     if (subject) rows = rows.filter(r => r.subject === subject)
     if (academicYear) rows = rows.filter(r => r.academic_year === academicYear)
-    const contests = [...new Set(rows.map(r => r.contest_name))].filter(Boolean).sort()
+    const counts = new Map()
+    for (const r of rows) if (r.contest_name) counts.set(r.contest_name, (counts.get(r.contest_name) || 0) + 1)
+    const contests = [...counts.entries()].map(([contest_name, c]) => ({ contest_name, c }))
+    contests.sort((a, b) => a.contest_name.localeCompare(b.contest_name))
     return Promise.resolve({ data: contests })
   },
   summary() {

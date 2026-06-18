@@ -67,6 +67,12 @@ body {
   box-shadow: 0 0 8px var(--accent);
 }
 
+.nav-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
 .nav-links {
   display: flex;
   gap: 0.25rem;
