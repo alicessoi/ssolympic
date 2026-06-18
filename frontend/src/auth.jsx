@@ -23,12 +23,14 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (username, password) => {
     const data = await api.login(username, password)
     setUser(data.user)
+    if (data.user) localStorage.setItem('ssoi_user', JSON.stringify(data.user))
     return data
   }, [])
 
   const logout = useCallback(async () => {
     try { await api.logout() } catch {}
     setUser(null)
+    localStorage.removeItem('ssoi_user')
   }, [])
 
   return (

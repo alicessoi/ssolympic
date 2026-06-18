@@ -1,7 +1,50 @@
 import { useEffect, useState, useMemo } from 'react'
-import { api } from '../api.js'
+import { api, buildAggregatedRows, pivot } from '../api.js'
+import * as XLSX from 'xlsx'
 
 const OLYMPIAD_SUBJECTS = ['数学', '物理', '化学', '生物', '信息学']
+
+function exportXlsx(rows, cols, sheetName, filename) {
+  const HEADERS = ['学年', '学科', ...cols, '总人数']
+  const data = rows.map(r => [r.year, r.subject, ...cols.map(a => r[a]), r['总人数']])
+  const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...data])
+  ws['!cols'] = HEADERS.map(() => ({ wch: 10 }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function summaryExport(filter, yearOptions, category) {
+  const { range, year, subject } = filter
+  const params = { subject, category }
+  if (range === 'last3' || range === 'last5') {
+    params.years = lastNYears(yearOptions, range === 'last3' ? 3 : 5).join(',')
+  } else if (year) {
+    params.year = year
+  }
+  const rows = buildAggregatedRows(params)
+  const out = pivot(rows, category)
+  const cols = category === 'league'
+    ? ['一等奖', '二等奖', '三等奖']
+    : category === 'national'
+    ? ['金牌', '银牌', '铜牌']
+    : ['一等奖', '二等奖', '三等奖', '金牌', '银牌', '铜牌']
+  const sheetName = category === 'league' ? '联赛人数' : category === 'national' ? '国赛人数' : '奖项人数'
+  const parts = ['ssoi_汇总', sheetName]
+  if (params.years) parts.push(`近${params.years.split(',').length}年`)
+  else if (params.year) parts.push(params.year)
+  if (params.subject) parts.push(params.subject)
+  const d = new Date()
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  exportXlsx(out, cols, sheetName, `${parts.join('_')}_${stamp}.xlsx`)
+}
 
 export default function Summary() {
   const [summary, setSummary] = useState(null)
@@ -16,6 +59,11 @@ export default function Summary() {
   const [nationalData, setNationalData] = useState({ data: [], columns: [] })
   const [leagueLoading, setLeagueLoading] = useState(false)
   const [nationalLoading, setNationalLoading] = useState(false)
+
+  const yearOptions = useMemo(() => {
+    if (!summary) return []
+    return [...new Set(summary.yearCategoryBySubject.map(r => r.academic_year))].sort().reverse()
+  }, [summary])
 
   useEffect(() => {
     setLeagueLoading(true)
@@ -41,11 +89,6 @@ export default function Summary() {
       .finally(() => setNationalLoading(false))
   }, [nationalFilter, yearOptions])
 
-  const yearOptions = useMemo(() => {
-    if (!summary) return []
-    return [...new Set(summary.yearCategoryBySubject.map(r => r.academic_year))].sort().reverse()
-  }, [summary])
-
   useEffect(() => {
     api.summary()
       .then(d => setSummary(d))
@@ -67,10 +110,7 @@ export default function Summary() {
           <h2 className="section-title" style={{ margin: 0 }}>联赛（省赛）奖项人数 · 学年 × 学科</h2>
           <button
             className="btn btn-accent"
-            onClick={() => window.open(
-              api.awardsByYearSubjectExportUrl(exportParams(leagueFilter, yearOptions, 'league')),
-              '_blank'
-            )}
+            onClick={() => summaryExport(leagueFilter, yearOptions, 'league')}
             disabled={!leagueData.data?.length}
           >
             导出
@@ -186,10 +226,7 @@ export default function Summary() {
           <h2 className="section-title" style={{ margin: 0 }}>国赛奖项人数 · 学年 × 学科</h2>
           <button
             className="btn btn-accent"
-            onClick={() => window.open(
-              api.awardsByYearSubjectExportUrl(exportParams(nationalFilter, yearOptions, 'national')),
-              '_blank'
-            )}
+            onClick={() => summaryExport(nationalFilter, yearOptions, 'national')}
             disabled={!nationalData.data?.length}
           >
             导出
