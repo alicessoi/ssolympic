@@ -162,10 +162,18 @@ const CATEGORIES = {
 }
 
 function buildAggregatedRows(filters) {
-  const { year, subject, category } = filters
+  const { year, years, subject, category } = filters
   const where = ['academic_year IS NOT NULL']
   const params = {}
-  if (year) {
+  if (years) {
+    // years: 逗号分隔的学年列表（如 "2022-2023,2023-2024,2024-2025"）
+    const list = String(years).split(',').map(s => s.trim()).filter(Boolean)
+    if (list.length) {
+      const placeholders = list.map((_, i) => `@y${i}`).join(', ')
+      where.push(`academic_year IN (${placeholders})`)
+      list.forEach((y, i) => { params[`y${i}`] = y })
+    }
+  } else if (year) {
     where.push('academic_year = @year')
     params.year = year
   }
@@ -229,14 +237,14 @@ function pivot(rows, category) {
 
 router.get('/awards-by-year-subject', (req, res) => {
   try {
-    const { year, subject, category } = req.query
+    const { year, years, subject, category } = req.query
     if (subject && !FILTER_SUBJECTS.has(subject)) {
       return res.status(400).json({ error: 'bad_request', message: 'invalid subject' })
     }
     if (category && !CATEGORIES[category]) {
       return res.status(400).json({ error: 'bad_request', message: 'invalid category' })
     }
-    const rows = buildAggregatedRows({ year, subject, category })
+    const rows = buildAggregatedRows({ year, years, subject, category })
     const out = pivot(rows, category)
     const cols = category && CATEGORIES[category]
       ? CATEGORIES[category].cols
@@ -250,14 +258,14 @@ router.get('/awards-by-year-subject', (req, res) => {
 
 router.get('/awards-by-year-subject/export', async (req, res) => {
   try {
-    const { year, subject, category } = req.query
+    const { year, years, subject, category } = req.query
     if (subject && !FILTER_SUBJECTS.has(subject)) {
       return res.status(400).json({ error: 'bad_request', message: 'invalid subject' })
     }
     if (category && !CATEGORIES[category]) {
       return res.status(400).json({ error: 'bad_request', message: 'invalid category' })
     }
-    const rows = buildAggregatedRows({ year, subject, category })
+    const rows = buildAggregatedRows({ year, years, subject, category })
     const out = pivot(rows, category)
     const cols = category && CATEGORIES[category]
       ? CATEGORIES[category].cols
@@ -276,7 +284,10 @@ router.get('/awards-by-year-subject/export', async (req, res) => {
     const buf = xlsxModule.write(wb, { type: 'buffer', bookType: 'xlsx' })
 
     const parts = ['ssoi_汇总', category === 'league' ? '联赛' : category === 'national' ? '国赛' : '奖项']
-    if (year) parts.push(year)
+    if (years) {
+      const n = String(years).split(',').length
+      parts.push(`近${n}年`)
+    } else if (year) parts.push(year)
     if (subject) parts.push(subject)
     const d = new Date()
     const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`

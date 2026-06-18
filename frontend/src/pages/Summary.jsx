@@ -9,26 +9,37 @@ export default function Summary() {
   const [error, setError] = useState('')
 
   // 联赛 / 国赛 两张表，各自带 学年+学科 筛选 + 导出
-  const [leagueFilter, setLeagueFilter] = useState({ year: '', subject: '' })
-  const [nationalFilter, setNationalFilter] = useState({ year: '', subject: '' })
+  // range: '' | 'last3' | 'last5' — 优先级高于单 year
+  const [leagueFilter, setLeagueFilter] = useState({ year: '', years: '', subject: '', range: '' })
+  const [nationalFilter, setNationalFilter] = useState({ year: '', years: '', subject: '', range: '' })
   const [leagueData, setLeagueData] = useState({ data: [], columns: [] })
   const [nationalData, setNationalData] = useState({ data: [], columns: [] })
   const [leagueLoading, setLeagueLoading] = useState(false)
   const [nationalLoading, setNationalLoading] = useState(false)
+
   useEffect(() => {
     setLeagueLoading(true)
-    api.awardsByYearSubject({ ...leagueFilter, category: 'league' })
+    // 发送到后端：range 优先 → years；否则单 year；都不传则全部
+    const { range, year, subject } = leagueFilter
+    const params = { subject, category: 'league' }
+    if (range === 'last3' || range === 'last5') params.years = lastNYears(yearOptions, range === 'last3' ? 3 : 5).join(',')
+    else if (year) params.year = year
+    api.awardsByYearSubject(params)
       .then(d => setLeagueData(d))
       .catch(e => setError(e.message))
       .finally(() => setLeagueLoading(false))
-  }, [leagueFilter])
+  }, [leagueFilter, yearOptions])
   useEffect(() => {
     setNationalLoading(true)
-    api.awardsByYearSubject({ ...nationalFilter, category: 'national' })
+    const { range, year, subject } = nationalFilter
+    const params = { subject, category: 'national' }
+    if (range === 'last3' || range === 'last5') params.years = lastNYears(yearOptions, range === 'last3' ? 3 : 5).join(',')
+    else if (year) params.year = year
+    api.awardsByYearSubject(params)
       .then(d => setNationalData(d))
       .catch(e => setError(e.message))
       .finally(() => setNationalLoading(false))
-  }, [nationalFilter])
+  }, [nationalFilter, yearOptions])
 
   const yearOptions = useMemo(() => {
     if (!summary) return []
@@ -57,7 +68,7 @@ export default function Summary() {
           <button
             className="btn btn-accent"
             onClick={() => window.open(
-              api.awardsByYearSubjectExportUrl({ ...leagueFilter, category: 'league' }),
+              api.awardsByYearSubjectExportUrl(exportParams(leagueFilter, yearOptions, 'league')),
               '_blank'
             )}
             disabled={!leagueData.data?.length}
@@ -68,21 +79,51 @@ export default function Summary() {
         <p className="muted" style={{ fontSize: '0.8rem', margin: '0.25rem 0 0.75rem' }}>
           仅统计「省级」记录（联赛），奖项统一为 一/二/三。
         </p>
-        <div className="row" style={{ gap: '1rem', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <div className="row" style={{ gap: '1rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
           <label>学年：
-            <select value={leagueFilter.year} onChange={e => setLeagueFilter(f => ({ ...f, year: e.target.value }))} style={{ marginLeft: 4 }}>
+            <select
+              value={leagueFilter.year}
+              onChange={e => setLeagueFilter(f => ({ ...f, year: e.target.value, range: '' }))}
+              style={{ marginLeft: 4 }}
+            >
               <option value="">全部</option>
               {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </label>
+          <div style={{ display: 'inline-flex', gap: 4 }}>
+            {[
+              { v: '', label: '全部' },
+              { v: 'last3', label: '近 3 年' },
+              { v: 'last5', label: '近 5 年' },
+            ].map(b => (
+              <button
+                key={b.v}
+                className={`btn ${leagueFilter.range === b.v ? 'btn-accent' : 'btn-ghost'}`}
+                style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}
+                onClick={() => setLeagueFilter(f => ({ ...f, range: b.v, year: '' }))}
+                disabled={!b.v && !leagueFilter.range}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
           <label>学科：
-            <select value={leagueFilter.subject} onChange={e => setLeagueFilter(f => ({ ...f, subject: e.target.value }))} style={{ marginLeft: 4 }}>
+            <select
+              value={leagueFilter.subject}
+              onChange={e => setLeagueFilter(f => ({ ...f, subject: e.target.value }))}
+              style={{ marginLeft: 4 }}
+            >
               <option value="">全部</option>
               {OLYMPIAD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
-          {(leagueFilter.year || leagueFilter.subject) && (
-            <button className="btn btn-ghost" onClick={() => setLeagueFilter({ year: '', subject: '' })}>清除</button>
+          {(leagueFilter.year || leagueFilter.subject || leagueFilter.range) && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => setLeagueFilter({ year: '', years: '', subject: '', range: '' })}
+            >
+              清除
+            </button>
           )}
           <span className="muted" style={{ marginLeft: 'auto', fontSize: '0.85rem' }}>
             {leagueLoading ? '加载中…' : `共 ${leagueData.data?.length || 0} 行`}
@@ -146,7 +187,7 @@ export default function Summary() {
           <button
             className="btn btn-accent"
             onClick={() => window.open(
-              api.awardsByYearSubjectExportUrl({ ...nationalFilter, category: 'national' }),
+              api.awardsByYearSubjectExportUrl(exportParams(nationalFilter, yearOptions, 'national')),
               '_blank'
             )}
             disabled={!nationalData.data?.length}
@@ -157,21 +198,51 @@ export default function Summary() {
         <p className="muted" style={{ fontSize: '0.8rem', margin: '0.25rem 0 0.75rem' }}>
           仅统计「国家级」记录（CMO/CPHO/CChO/CBO/NOI 五项国赛），奖项为 金/银/铜 原始值。
         </p>
-        <div className="row" style={{ gap: '1rem', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <div className="row" style={{ gap: '1rem', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
           <label>学年：
-            <select value={nationalFilter.year} onChange={e => setNationalFilter(f => ({ ...f, year: e.target.value }))} style={{ marginLeft: 4 }}>
+            <select
+              value={nationalFilter.year}
+              onChange={e => setNationalFilter(f => ({ ...f, year: e.target.value, range: '' }))}
+              style={{ marginLeft: 4 }}
+            >
               <option value="">全部</option>
               {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </label>
+          <div style={{ display: 'inline-flex', gap: 4 }}>
+            {[
+              { v: '', label: '全部' },
+              { v: 'last3', label: '近 3 年' },
+              { v: 'last5', label: '近 5 年' },
+            ].map(b => (
+              <button
+                key={b.v}
+                className={`btn ${nationalFilter.range === b.v ? 'btn-accent' : 'btn-ghost'}`}
+                style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}
+                onClick={() => setNationalFilter(f => ({ ...f, range: b.v, year: '' }))}
+                disabled={!b.v && !nationalFilter.range}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
           <label>学科：
-            <select value={nationalFilter.subject} onChange={e => setNationalFilter(f => ({ ...f, subject: e.target.value }))} style={{ marginLeft: 4 }}>
+            <select
+              value={nationalFilter.subject}
+              onChange={e => setNationalFilter(f => ({ ...f, subject: e.target.value }))}
+              style={{ marginLeft: 4 }}
+            >
               <option value="">全部</option>
               {OLYMPIAD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
-          {(nationalFilter.year || nationalFilter.subject) && (
-            <button className="btn btn-ghost" onClick={() => setNationalFilter({ year: '', subject: '' })}>清除</button>
+          {(nationalFilter.year || nationalFilter.subject || nationalFilter.range) && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => setNationalFilter({ year: '', years: '', subject: '', range: '' })}
+            >
+              清除
+            </button>
           )}
           <span className="muted" style={{ marginLeft: 'auto', fontSize: '0.85rem' }}>
             {nationalLoading ? '加载中…' : `共 ${nationalData.data?.length || 0} 行`}
@@ -229,4 +300,21 @@ export default function Summary() {
       </div>
     </div>
   )
+}
+
+// 从 yearOptions 取最近 N 年（yearOptions 已按降序排列）
+function lastNYears(yearOptions, n) {
+  return yearOptions.slice(0, n)
+}
+
+// 把 filter 状态转成导出 URL 参数（range 优先 → years；否则单 year）
+function exportParams(filter, yearOptions, category) {
+  const { range, year, subject } = filter
+  const params = { subject, category }
+  if (range === 'last3' || range === 'last5') {
+    params.years = lastNYears(yearOptions, range === 'last3' ? 3 : 5).join(',')
+  } else if (year) {
+    params.year = year
+  }
+  return params
 }
