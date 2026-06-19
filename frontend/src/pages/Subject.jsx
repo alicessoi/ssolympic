@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../api.js'
-import { SUBJECTS } from '../App.jsx'
+import { SUBJECTS } from '../subjects.js'
 import FilterBar from '../components/FilterBar.jsx'
 import AwardTable from '../components/AwardTable.jsx'
 import ExportButton from '../components/ExportButton.jsx'

@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth.jsx'
-import { SUBJECTS } from '../App.jsx'
+import { SUBJECTS } from '../subjects.js'
 
 export default function NavBar() {
   const { user, logout } = useAuth()
@@ -25,6 +25,7 @@ export default function NavBar() {
           ))}
         </div>
         <NavLink to="/summary">汇总</NavLink>
+        <NavLink to="/student">学生查询</NavLink>
         <NavLink to="/announcements">公告</NavLink>
         <NavLink to="/help">帮助</NavLink>
         {user ? (

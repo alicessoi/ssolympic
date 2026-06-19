@@ -25,7 +25,7 @@ const NATIONAL = new Set(['中国数学奥林匹克', '中国物理奥林匹克'
 const LEAGUE = new Set(['全国中学生数学奥林匹克联赛', '全国中学生物理奥林匹克联赛', '全国中学生化学奥林匹克联赛', '全国中学生生物学奥林匹克联赛', '全国青少年信息学奥林匹克联赛'])
 const CATEGORY_SQL = `
   CASE
-    WHEN ${[...NATIONAL].map(n => `contest_name LIKE '${n}%'`).join(' OR ')} THEN '国赛'
+    WHEN ${[...NATIONAL].map(n => `contest_name LIKE '${n}%'`).join(' OR ') || '1=0'} THEN '国赛'
     WHEN ${[...LEAGUE].map(n => `contest_name LIKE '${n}%'`).join(' OR ')} THEN '联赛'
     ELSE '其他'
   END
@@ -43,8 +43,8 @@ const db = new Database(DB_PATH, { readonly: true })
 
 const awards = db.prepare(`
   SELECT id, academic_year, contest_name, is_olympiad, issuer,
-         award_level, award, student_name, instructor, instructor_bonus,
-         subject, group_bonus, gender, middle_school, student_grade,
+         award_level, award, student_name, instructor,
+         subject, gender, middle_school, student_grade,
          cert_date, notes, registration_date,
          ${SUBJECT_SQL} AS subj,
          ${CATEGORY_SQL} AS category
@@ -59,9 +59,7 @@ const awards = db.prepare(`
   award: r.award,
   student_name: (r.student_name || '').trim(),
   instructor: r.instructor,
-  instructor_bonus: r.instructor_bonus,
   subject: r.subj,
-  group_bonus: r.group_bonus,
   gender: r.gender,
   middle_school: r.middle_school,
   student_grade: r.student_grade,

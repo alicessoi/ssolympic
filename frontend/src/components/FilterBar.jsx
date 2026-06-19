@@ -45,16 +45,13 @@ export default function FilterBar({ filters, years, contests, onChange, onReset 
             <option>一等奖</option>
             <option>二等奖</option>
             <option>三等奖</option>
-            <option>金牌</option>
-            <option>银牌</option>
-            <option>铜牌</option>
           </select>
         </div>
         <div className="field" style={{ flex: 1, minWidth: 200 }}>
-          <label>关键词（姓名/老师）</label>
+          <label>学生姓名</label>
           <input
             type="text"
-            placeholder="如：陈永安 / 谢一凡"
+            placeholder="输入学生姓名查询其获奖记录"
             value={filters.keyword || ''}
             onChange={e => update({ keyword: e.target.value })}
           />

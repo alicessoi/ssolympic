@@ -12,11 +12,7 @@ function filterAwards(filters = {}) {
   if (filters.contest) rows = rows.filter(r => r.contest_name === filters.contest)
   if (filters.keyword) {
     const kw = String(filters.keyword)
-    rows = rows.filter(r =>
-      (r.student_name || '').includes(kw) ||
-      (r.instructor || '').includes(kw) ||
-      (r.contest_name || '').includes(kw)
-    )
+    rows = rows.filter(r => (r.student_name || '').includes(kw))
   }
   return rows
 }
@@ -89,7 +85,6 @@ function applySort(rows, sort, dir) {
       const lv = { '国家级': 4, '省级': 3, '市级': 2, '校级': 1 }
       return (lv[x.award_level] ?? 0) - (lv[y.award_level] ?? 0)
     }
-    if (sort === 'instructor_bonus' || sort === 'group_bonus') return cmpNum(x[sort], y[sort])
     return cmpStr(x[sort], y[sort])
   })
 }
@@ -135,6 +130,29 @@ export const api = {
       ? CATEGORIES[category].cols
       : ['一等奖', '二等奖', '三等奖', '金牌', '银牌', '铜牌']
     return Promise.resolve({ data: out, columns: [...cols, '总人数'] })
+  },
+  subjectAwardAggregate({ years, category } = {}) {
+    const cfg = CATEGORIES[category]
+    if (!cfg) return Promise.resolve({ data: [], columns: [] })
+    const rows = buildAggregatedRows({ years: years ? years.join(',') : undefined, category })
+    const map = new Map()
+    for (const r of rows) {
+      const displayCol = cfg.awardMap[r.award]
+      if (!displayCol) continue
+      if (!map.has(r.subject)) {
+        const row = { subject: r.subject }
+        for (const a of cfg.cols) row[a] = 0
+        row['总人数'] = 0
+        map.set(r.subject, row)
+      }
+      const row = map.get(r.subject)
+      row[displayCol] = (row[displayCol] || 0) + r.c
+      row['总人数'] += r.c
+    }
+    return Promise.resolve({
+      data: [...map.values()],
+      columns: [...cfg.cols, '总人数'],
+    })
   },
   // 静态模式没有 URL；前端用 xlsx 库客户端导出
   awardsByYearSubjectExportUrl() { return null },

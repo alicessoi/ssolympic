@@ -74,9 +74,7 @@ CREATE TABLE IF NOT EXISTS awards (
   award TEXT,
   student_name TEXT NOT NULL,
   instructor TEXT,
-  instructor_bonus INTEGER,
   subject TEXT NOT NULL,
-  group_bonus INTEGER,
   gender TEXT,
   middle_school TEXT,
   student_grade TEXT,
@@ -453,9 +451,9 @@ function main() {
   const insert = db.prepare(`
     INSERT INTO awards (
       academic_year, contest_name, is_olympiad, issuer, award_level, award,
-      student_name, instructor, instructor_bonus, subject, group_bonus,
+      student_name, instructor, subject,
       gender, middle_school, student_grade, cert_date, notes, registration_date
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const insertMany = db.transaction((rows) => {
     for (const r of rows) insert.run(...r)
@@ -722,9 +720,7 @@ function parseGuoSaiSheet(ws, stats) {
         award,
         studentName,
         instructor,
-        null,           // instructor_bonus
         currentSubject,
-        null,           // group_bonus
         null,           // gender
         null,           // middle_school
         null,           // student_grade
