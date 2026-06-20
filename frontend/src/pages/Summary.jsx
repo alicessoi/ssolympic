@@ -77,8 +77,9 @@ export default function Summary() {
   const [leagueLoading, setLeagueLoading] = useState(false)
   const [nationalLoading, setNationalLoading] = useState(false)
 
-  // 近 N 年聚合（学科 × 奖项），共享 N 筛选
-  const [nYears, setNYears] = useState(5)
+  // 近 N 年聚合（学科 × 奖项）：联赛/国赛 各有独立 N
+  const [nYearsLeague, setNYearsLeague] = useState(5)
+  const [nYearsNational, setNYearsNational] = useState(5)
   const [leagueNAgg, setLeagueNAgg] = useState({ data: [], columns: [] })
   const [nationalNAgg, setNationalNAgg] = useState({ data: [], columns: [] })
   const [leagueNAggLoading, setLeagueNAggLoading] = useState(false)
@@ -117,28 +118,32 @@ export default function Summary() {
       .finally(() => setLoading(false))
   }, [])
 
-  // 近 N 年聚合：根据 nYears 取最近 N 个有数据的学年
-  const recentYears = useMemo(() => {
+  // 近 N 年聚合：根据 nYearsXxx 取最近 N 个有数据的学年
+  const recentYearsLeague = useMemo(() => {
     if (!yearOptions.length) return []
-    return nYears ? yearOptions.slice(0, nYears) : yearOptions
-  }, [yearOptions, nYears])
+    return nYearsLeague ? yearOptions.slice(0, nYearsLeague) : yearOptions
+  }, [yearOptions, nYearsLeague])
+  const recentYearsNational = useMemo(() => {
+    if (!yearOptions.length) return []
+    return nYearsNational ? yearOptions.slice(0, nYearsNational) : yearOptions
+  }, [yearOptions, nYearsNational])
 
   useEffect(() => {
-    if (!recentYears.length) return
+    if (!recentYearsLeague.length) return
     setLeagueNAggLoading(true)
-    api.subjectAwardAggregate({ years: recentYears, category: 'league' })
+    api.subjectAwardAggregate({ years: recentYearsLeague, category: 'league' })
       .then(d => setLeagueNAgg(d))
       .catch(e => setError(e.message))
       .finally(() => setLeagueNAggLoading(false))
-  }, [recentYears])
+  }, [recentYearsLeague])
   useEffect(() => {
-    if (!recentYears.length) return
+    if (!recentYearsNational.length) return
     setNationalNAggLoading(true)
-    api.subjectAwardAggregate({ years: recentYears, category: 'national' })
+    api.subjectAwardAggregate({ years: recentYearsNational, category: 'national' })
       .then(d => setNationalNAgg(d))
       .catch(e => setError(e.message))
       .finally(() => setNationalNAggLoading(false))
-  }, [recentYears])
+  }, [recentYearsNational])
 
   if (loading) return <div className="empty">加载中…</div>
   if (error) return <div className="error-msg">{error}</div>
@@ -346,157 +351,125 @@ export default function Summary() {
         </div>
       </div>
 
-      {/* 近 N 年聚合：共享的 N 筛选器 */}
-      <div className="card" style={{ background: 'transparent', border: 'none', padding: 0 }}>
-        <div className="row" style={{ alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <strong>近 N 年聚合：</strong>
-          <label>近
-            <select
-              value={nYears ?? 'all'}
-              onChange={e => setNYears(e.target.value === 'all' ? null : Number(e.target.value))}
-              style={{ margin: '0 4px' }}
-            >
-              <option value="3">3</option>
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="all">全部</option>
-            </select>
-            年
-          </label>
-          <span className="muted" style={{ fontSize: '0.85rem' }}>
-            取最近 {nYears ?? '全部'} 个有数据的学年，统计每个学科的累计获奖数。
-          </span>
-        </div>
-      </div>
+      {/* 近 N 年聚合：联赛 / 国赛 各有独立的 N 筛选 */}
+      <NYearsCard
+        title="联赛（近 N 年）奖项人数 · 学科 × 奖项"
+        description="仅统计「省级」记录，按近 N 年聚合，每个学科 1 行。"
+        nYears={nYearsLeague}
+        setNYears={setNYearsLeague}
+        onExport={() => summaryExportSubject(nYearsLeague, 'league')}
+        exportDisabled={!leagueNAgg.data?.length}
+        agg={leagueNAgg}
+        loading={leagueNAggLoading}
+        yearOptions={yearOptions}
+      />
 
-      {/* 联赛（近 N 年）奖项人数 · 学科 × 奖项 */}
-      <div className="card">
-        <div className="row-spread">
-          <h2 className="section-title" style={{ margin: 0 }}>联赛（近 N 年）奖项人数 · 学科 × 奖项</h2>
-          <button
-            className="btn btn-accent"
-            onClick={() => summaryExportSubject(nYears, 'league')}
-            disabled={!leagueNAgg.data?.length}
-          >
-            导出
-          </button>
-        </div>
-        <p className="muted" style={{ fontSize: '0.8rem', margin: '0.25rem 0 0.75rem' }}>
-          仅统计「省级」记录，按近 N 年聚合，每个学科 1 行。
-        </p>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>学科</th>
-                {leagueNAgg.columns?.filter(c => c !== '总人数').map(c => (
-                  <th key={c} style={{ textAlign: 'right' }}>{c}</th>
-                ))}
-                <th style={{ textAlign: 'right' }}>总人数</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leagueNAgg.data?.length ? (
-                <>
-                  {leagueNAgg.data.map((r, i) => (
-                    <tr key={i}>
-                      <td><strong>{r.subject}</strong></td>
-                      {leagueNAgg.columns.filter(c => c !== '总人数').map(c => (
-                        <td key={c} style={{ textAlign: 'right', color: r[c] === 0 ? '#a0aec0' : undefined }}>
-                          {r[c] === 0 ? '—' : r[c]}
-                        </td>
-                      ))}
-                      <td style={{ textAlign: 'right' }}><strong>{r['总人数']}</strong></td>
-                    </tr>
-                  ))}
-                  {(() => {
-                    const t = leagueNAgg.columns.reduce(
-                      (acc, c) => ({ ...acc, [c]: leagueNAgg.data.reduce((s, r) => s + (r[c] || 0), 0) }),
-                      {}
-                    )
-                    return (
-                      <tr style={{ fontWeight: 600, background: 'rgba(49,130,206,0.06)' }}>
-                        <td>合计</td>
-                        {leagueNAgg.columns.filter(c => c !== '总人数').map(c => (
-                          <td key={c} style={{ textAlign: 'right' }}>{t[c]}</td>
-                        ))}
-                        <td style={{ textAlign: 'right' }}>{t['总人数']}</td>
-                      </tr>
-                    )
-                  })()}
-                </>
-              ) : (
-                <tr><td colSpan={5} className="empty">{leagueNAggLoading ? '加载中…' : '无数据'}</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <NYearsCard
+        title="国赛（近 N 年）奖项人数 · 学科 × 奖项"
+        description="仅统计「国家级」记录（CMO/CPHO/CChO/CBO/NOI），按近 N 年聚合，每个学科 1 行。"
+        nYears={nYearsNational}
+        setNYears={setNYearsNational}
+        onExport={() => summaryExportSubject(nYearsNational, 'national')}
+        exportDisabled={!nationalNAgg.data?.length}
+        agg={nationalNAgg}
+        loading={nationalNAggLoading}
+        yearOptions={yearOptions}
+      />
+    </div>
+  )
+}
 
-      {/* 国赛（近 N 年）奖项人数 · 学科 × 奖项 */}
-      <div className="card">
-        <div className="row-spread">
-          <h2 className="section-title" style={{ margin: 0 }}>国赛（近 N 年）奖项人数 · 学科 × 奖项</h2>
-          <button
-            className="btn btn-accent"
-            onClick={() => summaryExportSubject(nYears, 'national')}
-            disabled={!nationalNAgg.data?.length}
-          >
-            导出
-          </button>
-        </div>
-        <p className="muted" style={{ fontSize: '0.8rem', margin: '0.25rem 0 0.75rem' }}>
-          仅统计「国家级」记录（CMO/CPHO/CChO/CBO/NOI），按近 N 年聚合，每个学科 1 行。
-        </p>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>学科</th>
-                {nationalNAgg.columns?.filter(c => c !== '总人数').map(c => (
-                  <th key={c} style={{ textAlign: 'right' }}>{c}</th>
+function NYearsCard({ title, description, nYears, setNYears, onExport, exportDisabled, agg, loading, yearOptions }) {
+  const isAll = nYears == null
+  const totalAvailable = yearOptions.length
+  return (
+    <div className="card">
+      <div className="row-spread">
+        <h2 className="section-title" style={{ margin: 0 }}>{title}</h2>
+        <button className="btn btn-accent" onClick={onExport} disabled={exportDisabled}>
+          导出
+        </button>
+      </div>
+      <p className="muted" style={{ fontSize: '0.8rem', margin: '0.25rem 0 0.75rem' }}>{description}</p>
+      <div className="row" style={{ alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+        <label>取最近
+          <input
+            type="number"
+            min="1"
+            max={totalAvailable}
+            value={isAll ? '' : nYears}
+            disabled={isAll}
+            onChange={e => {
+              const v = e.target.value === '' ? null : Math.max(1, Math.min(totalAvailable, Number(e.target.value) || 1))
+              setNYears(v)
+            }}
+            style={{ width: 70, margin: '0 4px' }}
+            className="text-input"
+          />
+          年
+        </label>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+          <input
+            type="checkbox"
+            checked={isAll}
+            onChange={e => setNYears(e.target.checked ? null : Math.min(5, totalAvailable || 5))}
+          />
+          全部
+        </label>
+        <span className="muted" style={{ fontSize: '0.85rem' }}>
+          {isAll
+            ? `共 ${totalAvailable} 个有数据的学年，全部计入`
+            : `取最近 ${nYears} 个学年（共 ${totalAvailable} 个可用）`}
+        </span>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>学科</th>
+              {agg.columns?.filter(c => c !== '总人数').map(c => (
+                <th key={c} style={{ textAlign: 'right' }}>{c}</th>
+              ))}
+              <th style={{ textAlign: 'right' }}>总人数</th>
+            </tr>
+          </thead>
+          <tbody>
+            {agg.data?.length ? (
+              <>
+                {agg.data.map((r, i) => (
+                  <tr key={i}>
+                    <td><strong>{r.subject}</strong></td>
+                    {agg.columns.filter(c => c !== '总人数').map(c => (
+                      <td key={c} style={{ textAlign: 'right', color: r[c] === 0 ? '#a0aec0' : undefined }}>
+                        {r[c] === 0 ? '—' : r[c]}
+                      </td>
+                    ))}
+                    <td style={{ textAlign: 'right' }}><strong>{r['总人数']}</strong></td>
+                  </tr>
                 ))}
-                <th style={{ textAlign: 'right' }}>总人数</th>
-              </tr>
-            </thead>
-            <tbody>
-              {nationalNAgg.data?.length ? (
-                <>
-                  {nationalNAgg.data.map((r, i) => (
-                    <tr key={i}>
-                      <td><strong>{r.subject}</strong></td>
-                      {nationalNAgg.columns.filter(c => c !== '总人数').map(c => (
-                        <td key={c} style={{ textAlign: 'right', color: r[c] === 0 ? '#a0aec0' : undefined }}>
-                          {r[c] === 0 ? '—' : r[c]}
-                        </td>
+                {(() => {
+                  const t = agg.columns.reduce(
+                    (acc, c) => ({ ...acc, [c]: agg.data.reduce((s, r) => s + (r[c] || 0), 0) }),
+                    {}
+                  )
+                  return (
+                    <tr style={{ fontWeight: 600, background: 'rgba(49,130,206,0.06)' }}>
+                      <td>合计</td>
+                      {agg.columns.filter(c => c !== '总人数').map(c => (
+                        <td key={c} style={{ textAlign: 'right' }}>{t[c]}</td>
                       ))}
-                      <td style={{ textAlign: 'right' }}><strong>{r['总人数']}</strong></td>
+                      <td style={{ textAlign: 'right' }}>{t['总人数']}</td>
                     </tr>
-                  ))}
-                  {(() => {
-                    const t = nationalNAgg.columns.reduce(
-                      (acc, c) => ({ ...acc, [c]: nationalNAgg.data.reduce((s, r) => s + (r[c] || 0), 0) }),
-                      {}
-                    )
-                    return (
-                      <tr style={{ fontWeight: 600, background: 'rgba(49,130,206,0.06)' }}>
-                        <td>合计</td>
-                        {nationalNAgg.columns.filter(c => c !== '总人数').map(c => (
-                          <td key={c} style={{ textAlign: 'right' }}>{t[c]}</td>
-                        ))}
-                        <td style={{ textAlign: 'right' }}>{t['总人数']}</td>
-                      </tr>
-                    )
-                  })()}
-                </>
-              ) : (
-                <tr><td colSpan={5} className="empty">{nationalNAggLoading ? '加载中…' : '无数据'}</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  )
+                })()}
+              </>
+            ) : (
+              <tr><td colSpan={5} className="empty">{loading ? '加载中…' : '无数据'}</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )
 }
+
