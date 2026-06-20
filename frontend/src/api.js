@@ -50,6 +50,17 @@ function rowKey(r) {
     .join('|')
 }
 
+// 登录凭证白名单（密码字段为 SHA-256 哈希）
+const CREDENTIALS = {
+  root: 'd877a10ab628d21886b2badddab391bac3596dd701930bb370f6473256fa309c',
+}
+
+async function sha256Hex(text) {
+  const buf = new TextEncoder().encode(text)
+  const hash = await crypto.subtle.digest('SHA-256', buf)
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 function filterAwards(filters = {}) {
   let rows = getAllAwards()
   if (filters.subject) rows = rows.filter(r => r.subject === filters.subject)
@@ -204,12 +215,15 @@ export const api = {
   // 静态模式没有 URL；前端用 xlsx 库客户端导出
   awardsByYearSubjectExportUrl() { return null },
   exportUrl() { return null },
-  // 静态模式登录为本地 mock
-  login(username, password) {
-    if (username && password) {
-      return Promise.resolve({ user: { username, role: 'admin' }, token: 'static' })
+  // 静态模式登录：本地 SHA-256 校验
+  async login(username, password) {
+    if (!username || !password) throw new Error('用户名和密码不能为空')
+    const hash = await sha256Hex(password)
+    const expected = CREDENTIALS[username]
+    if (expected && expected === hash) {
+      return { user: { username, role: 'admin' }, token: 'static' }
     }
-    return Promise.reject(new Error('用户名和密码不能为空'))
+    throw new Error('用户名或密码错误')
   },
   logout() { return Promise.resolve({ ok: true }) },
   me() {

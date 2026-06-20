@@ -17,8 +17,10 @@ export default function Help() {
       </div>
       <div className="card">
         <h3 className="section-title">登录</h3>
-        <p>v1 版本登录为管理员入口，用于后续 CRUD、批量导入、公告发布等写操作（v2 开放）。</p>
-        <p className="muted" style={{ marginTop: '0.5rem' }}>默认管理员用户名: <code>admin</code>，初始密码见部署文档。</p>
+        <p>登录后可进入「数据导入」页面（导航栏右上角），上传国赛/省赛数据表自动更新系统数据。</p>
+        <p className="muted" style={{ marginTop: '0.5rem' }}>
+          管理员账号：用户名 <code>root</code>，密码见部署文档（SHA-256 哈希校验，非明文存储）。
+        </p>
       </div>
       <div className="card">
         <h3 className="section-title">数据来源</h3>
