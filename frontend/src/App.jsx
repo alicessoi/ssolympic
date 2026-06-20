@@ -8,6 +8,7 @@ import Summary from './pages/Summary.jsx'
 import Student from './pages/Student.jsx'
 import Announcements from './pages/Announcements.jsx'
 import Help from './pages/Help.jsx'
+import Admin from './pages/Admin.jsx'
 
 export { SUBJECTS } from './subjects.js'
 
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/student" element={<Student />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/help" element={<Help />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Layout>

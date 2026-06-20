@@ -29,10 +29,13 @@ export default function NavBar() {
         <NavLink to="/announcements">公告</NavLink>
         <NavLink to="/help">帮助</NavLink>
         {user ? (
-          <span className="nav-user">
-            <span>{user.username}</span>
-            <button onClick={handleLogout}>退出</button>
-          </span>
+          <>
+            <NavLink to="/admin">数据导入</NavLink>
+            <span className="nav-user">
+              <span>{user.username}</span>
+              <button onClick={handleLogout}>退出</button>
+            </span>
+          </>
         ) : (
           <NavLink to="/login">登录</NavLink>
         )}

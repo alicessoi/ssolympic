@@ -3,8 +3,55 @@ import { AWARDS, SUMMARY, YEARS, SUBJECTS, CONTESTS, CATEGORIES } from './data.j
 // 所有 API 同步返回数据（data.js 内嵌），用 Promise.resolve 包装保持原调用方式不变
 const isStatic = true
 
+// 浏览器侧导入覆盖层：导入的获奖记录持久化到 localStorage，叠加在打包内嵌的 AWARDS 上方。
+const OVERRIDES_KEY = 'ssoi_awards_overrides'
+
+function loadOverrides() {
+  try {
+    const raw = localStorage.getItem(OVERRIDES_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch { return [] }
+}
+
+function saveOverrides(rows) {
+  localStorage.setItem(OVERRIDES_KEY, JSON.stringify(rows))
+}
+
+// 返回「内嵌 AWARDS + 用户导入覆盖」的合并视图
+function getAllAwards() {
+  const ov = loadOverrides()
+  return ov.length ? [...AWARDS, ...ov] : AWARDS
+}
+
+// 把导入的行合并进覆盖层（upsert by key），并写回 localStorage
+function applyOverrides(newRows) {
+  const existing = loadOverrides()
+  const baseMaxId = AWARDS.reduce((m, r) => Math.max(m, r.id || 0), 0)
+  const ovMaxId = existing.reduce((m, r) => Math.max(m, r.id || 0), baseMaxId)
+  let nextId = ovMaxId
+  const map = new Map(existing.map(r => [rowKey(r), r]))
+  let added = 0, updated = 0
+  for (const row of newRows) {
+    const k = rowKey(row)
+    const withId = { ...row, id: map.get(k)?.id ?? ++nextId }
+    if (map.has(k)) updated++; else added++
+    map.set(k, withId)
+  }
+  const merged = [...map.values()]
+  saveOverrides(merged)
+  return { added, updated, total: merged.length }
+}
+
+function rowKey(r) {
+  return [r.academic_year, r.contest_name, r.student_name, r.award, r.award_level]
+    .map(v => (v == null ? '' : String(v)).trim())
+    .join('|')
+}
+
 function filterAwards(filters = {}) {
-  let rows = AWARDS
+  let rows = getAllAwards()
   if (filters.subject) rows = rows.filter(r => r.subject === filters.subject)
   if (filters.academic_year) rows = rows.filter(r => r.academic_year === filters.academic_year)
   if (filters.award_level) rows = rows.filter(r => r.award_level === filters.award_level)
@@ -18,7 +65,7 @@ function filterAwards(filters = {}) {
 }
 
 function buildAggregatedRows({ year, years, subject, category }) {
-  let rows = AWARDS.filter(a => a.academic_year)
+  let rows = getAllAwards().filter(a => a.academic_year)
   if (years) {
     const list = String(years).split(',').map(s => s.trim()).filter(Boolean)
     if (list.length) rows = rows.filter(r => list.includes(r.academic_year))
@@ -102,7 +149,7 @@ export const api = {
     })
   },
   years(subject) {
-    const rows = AWARDS.filter(a => !subject || a.subject === subject)
+    const rows = getAllAwards().filter(a => !subject || a.subject === subject)
     const counts = new Map()
     for (const r of rows) if (r.academic_year) counts.set(r.academic_year, (counts.get(r.academic_year) || 0) + 1)
     const years = [...counts.entries()].map(([academic_year, c]) => ({ academic_year, c }))
@@ -110,7 +157,7 @@ export const api = {
     return Promise.resolve({ data: years })
   },
   contests(subject, academicYear) {
-    let rows = AWARDS
+    let rows = getAllAwards()
     if (subject) rows = rows.filter(r => r.subject === subject)
     if (academicYear) rows = rows.filter(r => r.academic_year === academicYear)
     const counts = new Map()
@@ -172,10 +219,21 @@ export const api = {
     } catch { return Promise.resolve({ user: null }) }
   },
   // 暴露原始数据，供客户端导出
-  _allAwards: () => AWARDS,
+  _allAwards: () => getAllAwards(),
   _columnsFor: (category) => category && CATEGORIES[category] ? CATEGORIES[category].cols : ['一等奖', '二等奖', '三等奖', '金牌', '银牌', '铜牌'],
+  // 覆盖层导入 API
+  _applyOverrides(rows) {
+    return Promise.resolve(applyOverrides(rows))
+  },
+  _overridesCount() {
+    return loadOverrides().length
+  },
+  _clearOverrides() {
+    localStorage.removeItem(OVERRIDES_KEY)
+    return Promise.resolve({ ok: true })
+  },
 }
 
 export { isStatic }
 export { filterAwards }
-export { buildAggregatedRows, pivot }
+export { buildAggregatedRows, pivot, getAllAwards, applyOverrides, loadOverrides, rowKey }
