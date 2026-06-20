@@ -133,7 +133,7 @@ function downloadUpdatedDataJs() {
 }
 
 export default function Admin() {
-  const { user, refresh } = useAuth()
+  const { user, loading } = useAuth()
   const [overridesCount, setOverridesCount] = useState(0)
   const [fileName, setFileName] = useState('')
   const [parsed, setParsed] = useState([])
@@ -145,10 +145,10 @@ export default function Admin() {
   const fileInputRef = useRef(null)
 
   useEffect(() => {
-    refresh()
     setOverridesCount(api._overridesCount())
-  }, [refresh])
+  }, [])
 
+  if (loading) return <div className="card empty">加载中…</div>
   if (!user) return <Navigate to="/login" replace />
 
   const refreshCount = () => setOverridesCount(api._overridesCount())
