@@ -87,7 +87,7 @@ export default function Summary() {
 
   const yearOptions = useMemo(() => {
     if (!summary) return []
-    return [...new Set(summary.yearCategoryBySubject.map(r => r.academic_year))].sort().reverse()
+    return [...new Set(summary.byYear.map(r => r.academic_year))].sort().reverse()
   }, [summary])
 
   useEffect(() => {
